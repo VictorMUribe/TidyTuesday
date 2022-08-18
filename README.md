@@ -2,4 +2,4 @@
 Weekly EDA projects
 
 
-this is intresting frfr
+work already frfr
