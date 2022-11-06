@@ -1,0 +1,255 @@
+---
+title: "Everest"
+author: "Victor M. Uribe"
+date: "2022-09-19"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+################################################################################
+                                **READ ME**
+
+To do List: (10/27/22 - Last Worked On)
+
+* create some new features
+* check correlation between variables
+* verify if the assumptions have been violated or not
+
+################################################################################
+
+
+
+
+```{r}
+library(tidyverse)
+library(rsample)
+ggpairs <- GGally::ggpairs
+select <- dplyr::select 
+```
+
+
+```{r}
+members <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/members.csv')
+glimpse(members)
+attach(members)
+```
+
+
+
+```{r}
+VIM::aggr(members, col = c("skyblue","orange"))
+```
+
+
+
+```{r}
+missvalues_visual <- 
+    members  %>%
+      summarise_all(list(~is.na(.)))%>%
+      pivot_longer(everything(),
+                   names_to = "variables", values_to="missing") %>%
+      count(variables, missing) %>%
+      ggplot(aes(y=variables,x=n,fill=missing))+
+      geom_col()+
+      scale_fill_manual(values=c("skyblue","orange"))+
+      theme(axis.title.y=element_blank())
+missvalues_visual
+```
+
+
+So most of the data that is giving issues is composed of mostly na
+
+
+
+
+
+
+
+
+
+# Data cleaning
+
+```{r}
+everest <- members %>% # should have an age
+  filter(age != 'NA' & peak_name == "Everest") %>% 
+  select(-c(peak_id,peak_name,expedition_id,member_id, death_height_metres,
+            injury_height_metres, highpoint_metres, death_cause,
+            citizenship, expedition_role, injury_type)) %>%
+  mutate(
+    #death_height_metres = ifelse(death_height_metres == NA, 0, death_height_metres), # issue wiith levels for some reason
+    #injury_height_metres = ifelse(injury_height_metres == NA, 0, injury_height_metres), # gives leveling issue 
+    #highpoint_metres = ifelse(highpoint_metres == 'NA', 0, highpoint_metres), # thows off the p values
+    season = factor(season),
+    sex = factor(sex),
+    #citizenship = factor(citizenship), # not significant after testing
+    #expedition_role = factor(expedition_role), # not significant after testing
+    hired = factor(hired), 
+    success = factor(success), # value being predicted
+    solo = factor(solo),
+    oxygen_used = factor(oxygen_used),
+    died = factor(died),
+    #death_cause = factor(death_cause), # issue
+    injured = factor(injured)#,
+    #injury_type = factor(injury_type) # issue with levels
+  )
+glimpse(everest)
+```
+
+
+
+
+```{r}
+missvalues_visual2 <- 
+    everest  %>%
+      summarise_all(list(~is.na(.)))%>%
+      pivot_longer(everything(),
+                   names_to = "variables", values_to="missing") %>%
+      count(variables, missing) %>%
+      ggplot(aes(y=variables,x=n,fill=missing))+
+      geom_col()+
+      scale_fill_manual(values=c("skyblue","orange"))+
+      theme(axis.title.y=element_blank())
+missvalues_visual2
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+psych::pairs.panels(everest[,c(-2)])
+```
+
+
+
+
+
+So we can still use accuracy as a measure of the models predictability 
+
+
+
+
+
+
+
+# Assumptions
+
+
+
+Logistic Regression Assumptions:
+
+* Response variable is binary or dichotomous
+
+* No multicollinearity among the predictor variables
+
+* Linear relationship of independent variables to log odds
+
+* large sample size
+
+* Problem with extreme outliers
+
+* independent observations
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Training and Testing data
+
+```{r}
+set.seed(5302)
+split <- initial_split(everest, prop = .70)
+
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+
+
+
+# fiting models
+
+```{r, Used for testing}
+glm(success ~.,data = train_data, family = "binomial") %>% summary()
+```
+
+
+
+
+```{r, fitted model with inly significant predictors only}
+sig_mod <- glm(success ~., data = train_data, family = "binomial") %>% MASS::stepAIC()
+```
+
+
+
+
+
+```{r}
+
+# Predict on test
+p <- predict(sig_mod, newdata = test_data, type = "response")
+
+# If p exceeds threshold of 0.5, 1 else 0
+yes_no <- ifelse(p > 0.5, 1, 0)
+
+# Convert to factor: p_class
+p_class <- factor(ifelse(yes_no == 1, TRUE, FALSE))
+
+# Create confusion matrix
+caret::confusionMatrix(p_class, test_data[["success"]])
+```
+
+
+**Accuracy : 0.8765**
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
