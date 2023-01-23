@@ -243,36 +243,136 @@ solo needs to be taken out since the outliers that were removed were all the cli
 
 
 ```{r}
+lasso_spec <- logistic_reg(penalty = 0.1, mixture = 1) %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>% 
+  add_formula(success ~.)
+
+lasso_fit <- wf %>%
+  add_model(lasso_spec) %>%
+  fit(train_data)
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+```
+
+
+```{r}
 set.seed(5302)
-sig_mod <- logistic_reg(penalty = 0.1, mixture = 1) %>% 
-  set_engine("glmnet") %>% 
-  fit(success ~ year + age + sex + hired + oxygen_used +
-        died + injured, data = train_data)
+boot <- bootstraps(train_data, strata = success)
 
+tune_spec <- logistic_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+lambda_grid <- grid_regular(penalty(), levels = 50)
 ```
-
-Note: season was pulled due to the following error
-
-\[\text{Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred}\]
 
 
 
 ```{r}
-sig_mod %>% tidy()
+doParallel::registerDoParallel()
+set.seed(5302)
+
+
+lasso_grid <- tune_grid(
+  wf %>% add_model(tune_spec),
+  resamples = boot,
+  grid = lambda_grid
+)
+
 ```
 
-\newpage
 
 ```{r}
-p <- sig_mod %>% 
-  predict(new_data = test_data, type = "class")
-  
-
-# Convert to factor: p_class
-factor(ifelse(p == TRUE, TRUE, FALSE)) %>% 
-  caret::confusionMatrix( test_data[["success"]])
+lasso_grid %>%
+  collect_metrics()
 ```
 
+
+
+```{r}
+lasso_grid %>%
+  collect_metrics() %>%
+  ggplot(aes(penalty, mean, color = .metric)) +
+  geom_errorbar(aes(
+    ymin = mean - std_err,
+    ymax = mean + std_err
+  ),
+  alpha = 0.5
+  ) +
+  geom_line() +
+  facet_wrap(~.metric, scales = "free", nrow = 2) +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+
+
+
+```{r}
+lowest_auc <- lasso_grid %>%
+  select_best("roc_auc", max = FALSE)
+
+final_lasso <- finalize_workflow(
+  wf %>% add_model(tune_spec),
+  lowest_auc
+)
+```
+
+
+
+
+
+```{r}
+library(vip)
+
+final_lasso %>%
+  fit(train_data) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = lowest_auc$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+```
+
+
+```{r}
+last_fit(
+  final_lasso,
+  split
+) %>%
+  collect_metrics()
+```
+
+```{r}
+fin_mod <- final_lasso %>%
+  fit(train_data)
+
+prob <- fin_mod %>%
+  predict(new_data = test_data)
+
+tmp <- factor(ifelse(prob == TRUE, TRUE, FALSE)) 
+caret::confusionMatrix(tmp, test_data[["success"]])
+```
+
+
+```{r}
+fin_mod %>% 
+  tidy() %>% 
+  filter(estimate != 0)
+```
+
+
+
+
+Note that we need to run a group lasso to account for seasons properly since it has more that two levels. But this still tells us the best variables.
 
 
 
@@ -314,8 +414,8 @@ caret::confusionMatrix(p_class, test_data[["success"]])
 
 |         | Accuracy | Sensitivity | Specificity
 |---      |---       |---          |---   
-|  Lasso  |  0.9009  |    0.8097   |  1.0000     
-|  AIC    |  0.9139  |    0.8515   |  0.9817
+|  Lasso  |  0.9135  |    0.8498   |  0.9843     
+|  AIC    |  0.9134  |    0.8515   |  0.9817
 
 
 
