@@ -1,5 +1,5 @@
 # TidyTuesday
-Weekly EDA projects
 
+EDA projects 
 
-work already frfr
+Note that you will have to download the pdf file to view the R markdown 
