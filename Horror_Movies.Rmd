@@ -1,0 +1,176 @@
+---
+title: "Horror Movies"
+author: "Victor M. Uribe"
+date: "2022-11-07"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2022-11-01')
+tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
+
+horror_movies <- tuesdata$horror_movies
+
+# Or read in the data manually
+
+horror_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-11-01/horror_movies.csv')
+
+glimpse(horror_movies)
+```
+
+
+
+
+```{r}
+VIM::aggr(horror_movies, col = c("light blue", "orange"))
+```
+Data with 60$\%$ or more data missing: 
+* tagline
+* backdrop_path
+* collection        
+* collection_name
+
+
+
+
+# Most Popular Horror Movie?
+
+
+
+```{r}
+length(horror_movies$title) # note that I do note have the hardware to vizualize this
+```
+
+```{r}
+top_10 <- horror_movies %>%
+  select(title, popularity) %>%
+  top_n(10)
+top_10
+```
+
+Which of the top 10 has the best popularity to budget ratio?
+
+
+\[ ROI = \frac{revenue}{budget}  \]
+
+
+```{r}
+
+horror_movies %>%
+  select(title, popularity, budget) %>%
+  top_n(popularity, 10) %>%
+  mutate( roi = round(vote_average/budget,2)) 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
