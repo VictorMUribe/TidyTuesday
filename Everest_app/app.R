@@ -44,22 +44,23 @@ everest <- members %>% # should have an age
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("Everest"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput(
-              selectInput(inputId = "year")
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
+  
+  # Application title
+  titlePanel("Everest"),
+  
+  # Sidebar with a slider input for number of bins 
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput(
+        selectInput(inputId = "year")
+      ),
+      
+      # Show a plot of the generated distribution
+      mainPanel(
+        plotOutput("distPlot")
+      )
     )
+  )
 )
 
 # Define server logic required to draw a histogram
@@ -73,3 +74,4 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+

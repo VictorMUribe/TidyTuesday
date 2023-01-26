@@ -33,6 +33,7 @@ select <- dplyr::select
 
 
 ```{r}
+
 members <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/members.csv')
 glimpse(members)
 attach(members)
@@ -559,47 +560,6 @@ As each row represents a unique climber we can assume they are independent from 
 #vcd::assocstats( xtabs(~ age + hired, everest_clean) )#not correlated
 #vcd::assocstats( xtabs(~ age + died, everest_clean) )#not correlated
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
