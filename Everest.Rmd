@@ -1,0 +1,571 @@
+---
+title: "Everest"
+author: "Victor M. Uribe"
+date: "2022-09-19"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+########################################################################################################
+                                **READ ME**
+
+To do List: (01/16/23 - Last Worked On)
+
+* Basically done, just figure out what "Linear relationship of independent variables to log odds" means
+
+########################################################################################################
+
+
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(rsample)
+ggpairs <- GGally::ggpairs
+select <- dplyr::select 
+```
+
+
+```{r}
+
+members <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/members.csv')
+glimpse(members)
+attach(members)
+```
+
+
+
+```{r}
+VIM::aggr(members, col = c("skyblue","orange"))
+```
+
+
+
+```{r}
+missvalues_visual <- 
+    members  %>%
+      summarise_all(list(~is.na(.)))%>%
+      pivot_longer(everything(),
+                   names_to = "variables", values_to="missing") %>%
+      count(variables, missing) %>%
+      ggplot(aes(y=variables,x=n,fill=missing))+
+      geom_col()+
+      scale_fill_manual(values=c("skyblue","orange"))+
+      theme(axis.title.y=element_blank())
+missvalues_visual
+```
+
+
+So most of the data that is giving issues is composed of mostly na
+
+
+
+
+
+
+
+
+
+# Data cleaning
+
+```{r}
+everest <- members %>% # should have an age
+  filter(age != 'NA' & peak_name == "Everest") %>% 
+  select(-c(peak_id,peak_name,expedition_id,member_id, death_height_metres,
+            injury_height_metres, highpoint_metres, death_cause,
+            citizenship, expedition_role, injury_type)) %>%
+  mutate(
+    #death_height_metres = ifelse(death_height_metres == NA, 0, death_height_metres), # issue wiith levels for some reason
+    #injury_height_metres = ifelse(injury_height_metres == NA, 0, injury_height_metres), # gives leveling issue 
+    #highpoint_metres = ifelse(highpoint_metres == 'NA', 0, highpoint_metres), # thows off the p values
+    season = factor(season),
+    sex = factor(sex),
+    #citizenship = factor(citizenship), # not significant after testing
+    #expedition_role = factor(expedition_role), # not significant after testing
+    hired = factor(hired), 
+    success = factor(success), # value being predicted
+    solo = factor(solo),
+    oxygen_used = factor(oxygen_used),
+    died = factor(died),
+    #death_cause = factor(death_cause), # issue
+    injured = factor(injured)#,
+    #injury_type = factor(injury_type) # issue with levels
+  )
+glimpse(everest)
+```
+
+
+
+
+```{r}
+missvalues_visual2 <- 
+    everest  %>%
+      summarise_all(list(~is.na(.)))%>%
+      pivot_longer(everything(),
+                   names_to = "variables", values_to="missing") %>%
+      count(variables, missing) %>%
+      ggplot(aes(y=variables,x=n,fill=missing))+
+      geom_col()+
+      scale_fill_manual(values=c("skyblue","orange"))+
+      theme(axis.title.y=element_blank())
+missvalues_visual2
+
+```
+
+
+
+
+
+```{r include=FALSE}
+# outliers
+
+test_mod <- glm(success ~., data = everest, family = "binomial") 
+
+cooksD <- cooks.distance(test_mod)
+influential <- cooksD[(cooksD > (3 * mean(cooksD, na.rm = TRUE)))]
+names_of_influential <- names(influential)
+outliers <- everest[names_of_influential,]
+everest_clean <- everest %>% anti_join(outliers)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+
+# EDA
+
+
+
+```{r fig.height=3, fig.width=6}
+ggplot(everest_clean, aes(x = age, fill = sex)) + geom_boxplot(alpha = .7) +
+  facet_wrap(~ success + sex )
+```
+
+
+| The figure above shows the success of each sex plotted on age. For it we see the median for males shift left meaning that the older you are the less likely you are to succeed. On the other hand we see that the median of the females plot tends to stay stationary, meaning that there aren't many attempts after the age of 60 years of age but also of those that do attempt much of them don't succeed.
+
+
+
+```{r fig.height=3, fig.width=6}
+(p_season <- ggplot(everest_clean, aes(x = season)) + 
+   geom_bar( fill = c("orange","light green","light yellow","light blue")))
+```
+
+| As seen the number of climbers whose season of expedition is spring or autumn is significantly larger than that of winter and summer. In order to understand the reason for it, I conducted some research, and found out that some environmental conditions, including barometric pressure (BP), perceived altitude (Alt), and climbing speed (Speed), are worse in the midwinter season than in May (Szymczak).
+
+
+```{r fig.height=3, fig.width=6}
+ggplot(everest_clean) + geom_boxplot(aes(x = age, y = injured, fill = injured),
+                                     alpha = .6) + facet_wrap(~success)
+```
+
+| The plot above shows us the age and if they were injured or not for both distributions of success and failure. Which as you can see folks older than 40 years of age tend not to succeed when injured. Even then looking at the median it seems that most that get injured and succeed are under 30 years of age.
+
+
+
+
+```{r fig.height=2, fig.width=6}
+ggplot(everest_clean) + geom_boxplot(aes(x = year, y = hired, fill = success),
+                                     alpha = .6) + facet_wrap(~success)
+```
+
+| For the figure above we see that most of the people hired was in the 2000's. Meaning that people more people were hired as the demand increase with the years. We also see that individuals who where hired tend to succeed a bit more often.
+
+
+```{r fig.height=2, fig.width=6}
+ggplot(everest_clean) + geom_boxplot(aes(x = year, y = oxygen_used, fill = success)
+                                     , alpha = .6) + facet_wrap(~success)
+```
+
+| As seen above there was absolutely no one that successfully climbed Everest without using oxygen. Which makes sense since Everest stands at a staggering 29,032 feet.
+
+
+
+
+
+
+
+
+
+
+
+
+# Training and Testing data
+
+```{r}
+set.seed(5302)
+split <- initial_split(everest_clean, prop = .70)
+
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+
+
+
+# fiting models
+
+```{r}
+sapply(lapply(everest, unique), length)
+sapply(lapply(everest_clean, unique), length)
+```
+
+solo needs to be taken out since the outliers that were removed were all the climbers that attempted to climb solo.
+
+
+
+
+
+\newpage
+
+
+
+
+
+
+
+# Lasso Regression 
+
+
+```{r}
+lasso_spec <- logistic_reg(penalty = 0.1, mixture = 1) %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>% 
+  add_formula(success ~.)
+
+lasso_fit <- wf %>%
+  add_model(lasso_spec) %>%
+  fit(train_data)
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+```
+
+
+```{r}
+set.seed(5302)
+boot <- bootstraps(train_data, strata = success)
+
+tune_spec <- logistic_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+lambda_grid <- grid_regular(penalty(), levels = 50)
+```
+
+
+
+```{r}
+doParallel::registerDoParallel()
+set.seed(5302)
+
+
+lasso_grid <- tune_grid(
+  wf %>% add_model(tune_spec),
+  resamples = boot,
+  grid = lambda_grid
+)
+
+```
+
+
+```{r}
+lasso_grid %>%
+  collect_metrics()
+```
+
+
+
+```{r}
+lasso_grid %>%
+  collect_metrics() %>%
+  ggplot(aes(penalty, mean, color = .metric)) +
+  geom_errorbar(aes(
+    ymin = mean - std_err,
+    ymax = mean + std_err
+  ),
+  alpha = 0.5
+  ) +
+  geom_line() +
+  facet_wrap(~.metric, scales = "free", nrow = 2) +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+
+
+
+```{r}
+lowest_auc <- lasso_grid %>%
+  select_best("roc_auc", max = FALSE)
+
+final_lasso <- finalize_workflow(
+  wf %>% add_model(tune_spec),
+  lowest_auc
+)
+```
+
+
+
+
+
+```{r}
+library(vip)
+
+final_lasso %>%
+  fit(train_data) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = lowest_auc$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+```
+
+
+```{r}
+last_fit(
+  final_lasso,
+  split
+) %>%
+  collect_metrics()
+```
+
+```{r}
+fin_mod <- final_lasso %>%
+  fit(train_data)
+
+prob <- fin_mod %>%
+  predict(new_data = test_data)
+
+tmp <- factor(ifelse(prob == TRUE, TRUE, FALSE)) 
+caret::confusionMatrix(tmp, test_data[["success"]])
+```
+
+
+```{r}
+fin_mod %>% 
+  tidy() %>% 
+  filter(estimate != 0)
+```
+
+
+
+
+Note that we need to run a group lasso to account for seasons properly since it has more that two levels. But this still tells us the best variables.
+
+
+
+
+
+
+\newpage
+
+
+# Classic Logistic Regression
+
+
+```{r}
+sig_mod_aic <- glm(success ~ year + age + sex + hired + oxygen_used + died + injured,
+               data = train_data, family = "binomial") %>% MASS::stepAIC(trace = FALSE)
+
+sig_mod_aic %>% summary()
+```
+
+\newpage
+
+```{r}
+# Predict on test
+p <- predict(sig_mod_aic, newdata = test_data, type = "response")
+
+# If p exceeds threshold of 0.5, 1 else 0
+yes_no <- ifelse(p > 0.5, 1, 0)
+
+# Convert to factor: p_class
+p_class <- factor(ifelse(yes_no == 1, TRUE, FALSE))
+
+# Create confusion matrix
+caret::confusionMatrix(p_class, test_data[["success"]])
+```
+
+
+\vspace{3mm}
+
+
+|         | Accuracy | Sensitivity | Specificity
+|---      |---       |---          |---   
+|  Lasso  |  0.9135  |    0.8498   |  0.9843     
+|  AIC    |  0.9134  |    0.8515   |  0.9817
+
+
+
+
+
+
+
+\newpage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Validating Assumptions
+
+
+
+Logistic Regression Assumptions:
+
+* Response variable is binary or dichotomous
+
+```{r}
+levels(everest_clean$success)
+```
+
+
+
+* Linear relationship of independent variables to log odds
+
+
+
+* large sample size
+
+```{r}
+dim(everest_clean)
+```
+
+Which is 39x the minimum sample size needed (500 is the minimum)
+
+
+
+* Problem with extreme outliers
+
+We use cooks distance to eliminate the outliers
+
+
+
+
+* independent observations
+
+
+As each row represents a unique climber we can assume they are independent from one another.
+
+
+
+
+
+
+
+* No multicollinearity among the predictor variables
+
+
+|  df | Weak | Medium | Strong
+|---  |---   |---     |---   
+|  1  | 0.10 |  0.30  | 0.50    
+|  2 	| 0.07 |  0.21  | 0.35
+|  3  | 0.06 |  0.17  | 0.29
+|  4  | 0.05 |  0.15  | 0.25
+|  5  | 0.04 |  0.13  | 0.22
+
+
+| using Cramer's V we conclude that there is no violation of multicollinearity between the predictor variables. Note I used Cramer's V and the table provided above to find strong associations between the categorical predictors and numerical.
+
+
+
+
+\newpage
+
+```{r}
+#vcd::assocstats( xtabs(~ sex + season, everest_clean) ) #not correlated
+#vcd::assocstats( xtabs(~ sex + oxygen_used, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ sex + injured, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ sex + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ sex + died, everest_clean) )#not correlated
+
+#vcd::assocstats( xtabs(~ season + oxygen_used, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ season + injured, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ season + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ season + died, everest_clean) )#not correlated
+
+#vcd::assocstats( xtabs(~ oxygen_used + injured, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ oxygen_used + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ oxygen_used + died, everest_clean) )#not correlated
+
+#vcd::assocstats( xtabs(~ injured + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ injured + died, everest_clean) )#not correlated
+
+#vcd::assocstats( xtabs(~ hired + died, everest_clean) )#not correlated
+```
+
+
+
+```{r}
+#vcd::assocstats( xtabs(~ year + solo, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ year + sex, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ year + season, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ year + oxygen_used, everest_clean) )#            correlated
+#vcd::assocstats( xtabs(~ year + injured, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ year + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ year + died, everest_clean) )#not correlated
+```
+
+
+```{r}
+#vcd::assocstats( xtabs(~ age + solo, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + sex, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + season, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + oxygen_used, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + injured, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + hired, everest_clean) )#not correlated
+#vcd::assocstats( xtabs(~ age + died, everest_clean) )#not correlated
+```
+
+
+
+
+
+
+
+
+
