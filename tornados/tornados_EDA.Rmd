@@ -1,0 +1,63 @@
+---
+title: "EDA"
+author: "Victor M. Uribe"
+date: "2023-05-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(tidyclust)
+library(finetune)
+library(shinydashboard)
+library(timetk)
+```
+
+
+```{r}
+tornados <- data.table::fread('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-05-16/tornados.csv')
+
+tornados %>% 
+  glimpse()
+```
+
+
+```{r}
+dat <- tornados %>% 
+  select(-c(yr,mo,dy,date,time)) %>% 
+  mutate(
+    tonado_ID = om,
+    time_zone = factor(tz),
+    state = factor(st),
+    state_fips = stf,
+    total_injuries = inj,
+    deaths = fat,
+    
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
