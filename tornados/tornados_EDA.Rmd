@@ -32,17 +32,133 @@ tornados %>%
 
 ```{r}
 dat <- tornados %>% 
-  select(-c(yr,mo,dy,date,time)) %>% 
-  mutate(
-    tonado_ID = om,
+  select(-c(yr,mo,dy,time)) %>% 
+  transmute(
+    tornado_ID = om,
+    date = lubridate::ymd(date),
     time_zone = factor(tz),
+    datetime_UTC = datetime_utc,
     state = factor(st),
     state_fips = stf,
+    magnitude = mag,
     total_injuries = inj,
     deaths = fat,
-    
+    loss = loss,
+    starting_latitude = slat,
+    starting_longitude = slon,
+    ending_latitude = elat,
+    ending_longitude = elon,
+    length_miles = len,
+    width_yards = wid,
+    total_states_affected = factor(ns),
+    sn = sn,
+    f1 = f1,
+    f2 = f2,
+    f3 = f3,
+    f4 = f4,
+    was_magnitude_estimated = factor(fc)
   )
+dat
 ```
+
+
+
+```{r}
+VIM::aggr(dat, col = c("skyblue", "orange"))
+```
+
+```{r}
+na_prop <- function(col){
+  sum(is.na(col))/length(col)
+}
+
+data.frame(prop = sapply(data.frame(dat), na_prop) ) %>% 
+  select(prop) %>% 
+  filter(prop > 0)
+```
+
+
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+dat_time <- dat %>% 
+  filter_by_time(date,"1996-01-01", "2022-12-30")
+
+
+
+data.frame(prop = sapply(data.frame(dat_time), na_prop) ) %>% 
+  select(prop) %>% 
+  filter(prop > 0)
+```
+
+
+
+
+
+
+## take out the loss variable since more than 10 percent is missing
+
+
+
+```{r}
+doParallel::registerDoParallel()
+dat %>% 
+  #group_by(state) %>% 
+  plot_time_series(date, deaths)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
